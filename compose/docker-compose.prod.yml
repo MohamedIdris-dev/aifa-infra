@@ -1,0 +1,116 @@
+# Production stack for Hetzner VPS
+# Usage (on server, from this directory):
+#   cp ../.env.example .env   # fill secrets
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Expected sibling layout under /apps:
+#   aifa-ecommerce-api/aifa_backend
+#   aifa-ecommerce-web/aifa_frontend
+#   aifa-infra/compose   (this file)
+
+name: aifa-ecommerce
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: aifa-ecommerce-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aifa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-aifa_ecommerce}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${POSTGRES_LOCAL_PORT:-5432}:5432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" || exit 1',
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - aifa-ecommerce
+
+  api:
+    image: ${API_IMAGE:-aifa-ecommerce-api:latest}
+    container_name: aifa-ecommerce-api
+    build:
+      context: ../../aifa-ecommerce-api/aifa_backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PORT: "8080"
+      GO_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:-aifa}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-aifa_ecommerce}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      JWT_ADMIN_SECRET: ${JWT_ADMIN_SECRET:?set JWT_ADMIN_SECRET}
+      JWT_CUSTOMER_SECRET: ${JWT_CUSTOMER_SECRET:?set JWT_CUSTOMER_SECRET}
+      INVOICE_PDF_DIR: ${INVOICE_PDF_DIR:-/app/invoices}
+      VERIFY_EMAIL_BASE_URL: ${VERIFY_EMAIL_BASE_URL:-}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - invoice_data:/app/invoices
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health | grep -q ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - aifa-ecommerce
+
+  web:
+    image: ${WEB_IMAGE:-aifa-ecommerce-web:latest}
+    container_name: aifa-ecommerce-web
+    build:
+      context: ../../aifa-ecommerce-web/aifa_frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://aifascentique.shop}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://aifascentique.shop}
+        API_URL: http://api:8080
+    restart: unless-stopped
+    environment:
+      API_URL: http://api:8080
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://aifascentique.shop}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://aifascentique.shop}
+      NEXT_PUBLIC_STORE_NAME: ${NEXT_PUBLIC_STORE_NAME:-AIFA SCENTIQUE}
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - aifa-ecommerce
+
+volumes:
+  postgres_data:
+    name: aifa-ecommerce-postgres-data
+  invoice_data:
+    name: aifa-ecommerce-invoice-data
+
+networks:
+  aifa-ecommerce:
+    name: aifa-ecommerce-net
