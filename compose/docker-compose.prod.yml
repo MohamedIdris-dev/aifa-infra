@@ -16,9 +16,9 @@ services:
     container_name: aifa-ecommerce-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-aifa}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-aifa_ecommerce}
+      POSTGRES_DB: ${POSTGRES_DB:-aifa_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -48,7 +48,7 @@ services:
     environment:
       PORT: "8080"
       GO_ENV: production
-      DATABASE_URL: postgres://${POSTGRES_USER:-aifa}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-aifa_ecommerce}?sslmode=disable
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-aifa_db}?sslmode=disable
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
       JWT_ADMIN_SECRET: ${JWT_ADMIN_SECRET:?set JWT_ADMIN_SECRET}
       JWT_CUSTOMER_SECRET: ${JWT_CUSTOMER_SECRET:?set JWT_CUSTOMER_SECRET}
@@ -98,7 +98,7 @@ services:
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://aifascentique.shop}
       NEXT_PUBLIC_STORE_NAME: ${NEXT_PUBLIC_STORE_NAME:-AIFA SCENTIQUE}
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${WEB_PUBLISH_PORT:-3001}:3000"
     depends_on:
       api:
         condition: service_healthy
