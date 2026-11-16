@@ -172,8 +172,9 @@ Production stack is defined in `aifa-infra/compose/docker-compose.prod.yml`.
 |-------------|---------|
 | `aifa-ecommerce-postgres-data` | PostgreSQL data |
 | `aifa-ecommerce-invoice-data` | Generated invoice PDFs |
+| `aifa-ecommerce-web-next-cache` | Next.js `/_next/image` optimizer cache (survives web redeploys) |
 
-> **Important:** Volume names match the original backend-only deployment. Migrating to the unified stack preserves your database.
+> **Important:** Volume names match the original backend-only deployment. Migrating to the unified stack preserves your database. Do not `docker volume rm aifa-ecommerce-web-next-cache` unless you intend a cold image-cache start.
 
 ### Port 3001 (not 3000)
 
