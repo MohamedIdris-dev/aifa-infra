@@ -38,8 +38,32 @@ require_repo_conf() {
   fi
 }
 
+# Other enabled nginx files that also serve this site. nginx keeps the first server
+# block per name and only warns, so a second copy (e.g. one certbot edited, or the old
+# "default" site) would silently override the repo config.
+other_site_configs() {
+  local live_real f
+  live_real="$(readlink -f "${LIVE_AVAILABLE}" 2>/dev/null || echo "${LIVE_AVAILABLE}")"
+  grep -rlE 'server_name[^;]*aifascentique\.shop' /etc/nginx/sites-enabled /etc/nginx/conf.d /etc/nginx/nginx.conf 2>/dev/null \
+    | while read -r f; do
+        [[ "$(readlink -f "$f")" == "${live_real}" ]] || echo "$f"
+      done
+}
+
+report_other_site_configs() {
+  local others
+  others="$(other_site_configs || true)"
+  if [[ -n "${others}" ]]; then
+    echo "Other nginx files also serve aifascentique.shop:" >&2
+    echo "${others}" >&2
+    echo "Disable them (remove the sites-enabled link or move the conf.d file) so the repo config is the only one." >&2
+    return 1
+  fi
+}
+
 mode_diff() {
   require_repo_conf
+  report_other_site_configs || true
   if [[ ! -f "${LIVE_AVAILABLE}" ]]; then
     echo "Live file missing: ${LIVE_AVAILABLE}" >&2
     echo "Repo file would be installed from: ${REPO_CONF}" >&2
@@ -54,6 +78,7 @@ mode_diff() {
 mode_apply() {
   require_root
   require_repo_conf
+  report_other_site_configs || exit 1
 
   local backup=""
   if [[ -f "${LIVE_AVAILABLE}" ]]; then
@@ -79,7 +104,8 @@ mode_apply() {
     cp -a "${backup}" "${LIVE_AVAILABLE}"
     echo "Restored backup ${backup} → ${LIVE_AVAILABLE}" >&2
   else
-    echo "No backup to restore (fresh install failed validation)." >&2
+    rm -f "${LIVE_ENABLED}" "${LIVE_AVAILABLE}"
+    echo "Fresh install failed validation; removed ${LIVE_ENABLED} and ${LIVE_AVAILABLE}." >&2
   fi
   exit 1
 }
