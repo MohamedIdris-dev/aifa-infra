@@ -349,12 +349,39 @@ upstream aifa_api {
 }
 ```
 
-### Install site config
+### Install / update site config (`scripts/apply-nginx.sh`)
+
+Prefer the apply script over a raw `cp`. It backs up the live file, installs the repo config, ensures the `sites-enabled` symlink, runs `nginx -t`, and only reloads on success (restores the backup on failure).
+
+From `/apps/aifa-infra` on the VPS:
+
+```bash
+# 1. Inspect drift (no changes)
+sudo ./scripts/apply-nginx.sh --diff
+
+# 2. Apply repo config → live nginx
+sudo ./scripts/apply-nginx.sh
+```
+
+Manual equivalent (first-time only if you prefer):
 
 ```bash
 sudo cp /apps/aifa-infra/nginx/aifascentique.shop.conf /etc/nginx/sites-available/
 sudo ln -sf /etc/nginx/sites-available/aifascentique.shop.conf /etc/nginx/sites-enabled/
 ```
+
+### Rate limits (repo config)
+
+Zones are keyed on `$binary_remote_addr`. This VPS sits directly on the public IP (no CDN); `$remote_addr` is treated as the client. Webhook and `/health` are **not** rate-limited.
+
+| Zone | Rate | Burst | Paths |
+|------|------|-------|-------|
+| `aifa_otp` | 6r/m | 5 | `/api/customer/auth/request-otp`, `verify-otp`, `msg91-verify` |
+| `aifa_auth` | 10r/m | 5 | `/api/admin/auth/login`, admin change-password |
+| `aifa_order` | 20r/m | 10 | `/api/store/orders`, `/api/store/payments/create` |
+| `aifa_api` | 10r/s | 30 | all other `/api/*` |
+
+`client_max_body_size 20M` covers admin image uploads (backend max 10 MiB + multipart overhead).
 
 ### SSL with Certbot
 
