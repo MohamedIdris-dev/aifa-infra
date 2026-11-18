@@ -378,6 +378,7 @@ Zones are keyed on `$binary_remote_addr`. This VPS sits directly on the public I
 |------|------|-------|-------|
 | `aifa_otp` | 6r/m | 5 | `/api/customer/auth/request-otp`, `verify-otp`, `msg91-verify` |
 | `aifa_auth` | 10r/m | 5 | `/api/admin/auth/login`, admin change-password |
+| `aifa_coupon` | 10r/m | 5 | `/api/store/coupons/validate` (coupon preview at checkout) |
 | `aifa_order` | 20r/m | 10 | `/api/store/orders`, `/api/store/payments/create` |
 | `aifa_api` | 10r/s | 30 | all other `/api/*` |
 
